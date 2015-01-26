@@ -166,27 +166,18 @@ ngx_http_video_thumbextractor_get_thumb(ngx_http_video_thumbextractor_loc_conf_t
     }
 
     // Find the first video stream
-    videoStream = -1;
-    for (i = 0; i < pFormatCtx->nb_streams; i++) {
-        if (pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
-            videoStream = i;
-            break;
-        }
-    }
+    videoStream = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &pCodec, 0);
 
-    if (videoStream == -1) {
-        ngx_log_error(NGX_LOG_ERR, log, 0, "video thumb extractor module: Didn't find a video stream");
+    if (videoStream == AVERROR_STREAM_NOT_FOUND) {
+        ngx_log_error(NGX_LOG_ERR, log, 0, "video thumb extractor module: Couldn't find a video stream");
+        goto exit;
+    } else if (videoStream == AVERROR_DECODER_NOT_FOUND) {
+        ngx_log_error(NGX_LOG_ERR, log, 0, "video thumb extractor module: Codec not found");
         goto exit;
     }
 
     // Get a pointer to the codec context for the video stream
     pCodecCtx = pFormatCtx->streams[videoStream]->codec;
-
-    // Find the decoder for the video stream
-    if ((pCodec = avcodec_find_decoder(pCodecCtx->codec_id)) == NULL) {
-        ngx_log_error(NGX_LOG_ERR, log, 0, "video thumb extractor module: Codec %d not found", pCodecCtx->codec_id);
-        goto exit;
-    }
 
     // Open codec
     if ((avcodec_open2(pCodecCtx, pCodec, NULL)) < 0) {
